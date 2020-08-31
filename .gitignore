@@ -1,6 +1,8 @@
 /node_modules
 /public/hot
 /public/storage
+/public/js/*
+/public/css/app.css
 /storage/*.key
 /storage/db
 /vendor
@@ -12,3 +14,4 @@ npm-debug.log
 yarn-error.log
 stuff/
 .env.testing
+.idea

@@ -13,18 +13,22 @@ import draggable from 'vuedraggable'
 // Editor
 import EditorContent from '../components/EditorContent.vue'
 
+import Tooltip from 'vue-directive-tooltip';
+import 'vue-directive-tooltip/dist/vueDirectiveTooltip.css';
+Vue.use(Tooltip);
+
 // Views (starred, trash)
 app_data.active_view_label = null;
 app_data.views = [
     // Starred
     {
-        title: 'Starred',
+        title: '<i class="fas fa-star"></i> Starred',
         label: 'starred',
     },
 
     // Trash
     {
-        title: 'Trash',
+        title: '<i class="fas fa-trash"></i> Trash',
         label: 'trash',
     },
 ]
@@ -41,7 +45,6 @@ app_data.notebook_context_menu = [
         method: "confirm_delete_notebook",
     },
 ]
-
 
 var vueApp = new Vue({
     el: "#app",
@@ -63,13 +66,22 @@ var vueApp = new Vue({
         }
 
         this.editor = this.$refs.editor.editor
+        this.note_history = []
         this.sort_notes()
         this.sort_notebooks()
         this.load_note_from_hash()
         this.editor_events()
+        this.note_changed = false
 
         // On hash change
         window.onhashchange = this.onhashchange
+
+        window.addEventListener('beforeunload', (e) => {
+            if (this.note_changed) {
+                e.preventDefault()
+                e.returnValue = ''
+            }
+        });
     },
 
     methods: {
@@ -181,6 +193,12 @@ var vueApp = new Vue({
          *
          */
         view_note: function(note) {
+            this.set_content(this.getActiveNote(), this.editor.getHTML())
+
+            this.note_history = [] // reset history.
+            this.note_history.push(note.content)
+            this.note_history_index = 0; // reset history index.
+
             this.active_note_id = note.id
 
             // Set active view/notebook
@@ -309,7 +327,7 @@ var vueApp = new Vue({
                     let note_index = self.notes.indexOf(note)
                     self.notes.splice(note_index, 1)
                     self.view_note_after_deletion(note)
-                }                
+                }
             })
         },
 
@@ -323,7 +341,7 @@ var vueApp = new Vue({
                 },
                 success: function(response) {
                     note.notebook_id = notebook_id
-                }                
+                }
             })
         },
 
@@ -348,7 +366,7 @@ var vueApp = new Vue({
                     self.view_note(note)
 
                     self.$refs.note_title.focus()
-                }                
+                }
             })
         },
 
@@ -364,7 +382,7 @@ var vueApp = new Vue({
                 success: function(response) {
                     let notebook = response.data.notebook
                     self.notebooks.push(notebook)
-                }                
+                }
             })
         },
 
@@ -400,6 +418,10 @@ var vueApp = new Vue({
          *
          */
         set_content: function(note, content) {
+            if (!this.note_changed) return
+
+            this.note_changed = false;
+
             let self = this
 
             Ajax.post({
@@ -653,6 +675,80 @@ var vueApp = new Vue({
         },
 
         /**
+         * Create debounced function
+         *
+         */
+        debounce(func, wait) {
+            var timeout;
+            return function() {
+                clearTimeout(timeout)
+                timeout = setTimeout(() => {
+                    func()
+                }, wait)
+            };
+        },
+
+        /**
+         * Undo note history
+         *
+         */
+        note_history_undo: function() {
+            if (!this.note_history) {
+                // No history.
+                return
+            }
+
+            if (this.note_history_index + 1 == this.note_history.length) {
+                // At end of history. Cant undo anymore.
+                return
+            }
+
+            this.note_history_index++
+            this.editor.setContent(this.note_history[this.note_history.length - 1 - this.note_history_index], false)
+
+            // Manually set note changed, instead of using editor.setContent()
+            // because that would update history.
+            this.note_debounce_content()
+        },
+
+        /**
+         * Redo note history
+         *
+         */
+        note_history_redo: function() {
+            if (!this.note_history) {
+                // No history
+                return
+            }
+
+            if (this.note_history_index == 0) {
+                return
+            }
+
+            this.note_history_index--
+            this.editor.setContent(this.note_history[this.note_history.length - 1 - this.note_history_index], false)
+
+            // Manually set note changed, instead of using editor.setContent()
+            // because that would update history.
+            this.note_debounce_content()
+        },
+
+        /**
+         * Call this when content changes in the editor
+         * And it will debounce
+         *
+         */
+        note_debounce_content: function() {
+            this.note_changed = true
+
+            let set_content = this.debounce(() => {
+                this.set_content(this.getActiveNote(), this.editor.getHTML())
+            }, 1000)
+
+            set_content()
+        },
+
+        /**
          * Handle events on editor and title fields
          *
          */
@@ -660,9 +756,33 @@ var vueApp = new Vue({
             let self = this
 
             // Update content backend on change.
-            self.editor.on('update', ({ getHTML }) => {
-                self.set_content(self.getActiveNote(), getHTML())
+            this.editor.on('update', ({ getHTML }) => {
+                this.note_debounce_content()
+
+                // Save history
+                this.note_history.push(this.editor.getHTML())
             })
+
+
+            document.querySelector('#editor_content').addEventListener('keydown', function(e) {
+                // ctrl + z (undo)
+                if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() == 'z') {
+                    e.preventDefault()
+                    self.note_history_undo()
+                }
+
+                // ctrl + shift + z (redo)
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() == 'z') {
+                    e.preventDefault()
+                    self.note_history_redo()
+                }
+
+                // ctrl + y (redo)
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() == 'y') {
+                    e.preventDefault()
+                    self.note_history_redo()
+                }
+            });
 
             // On key down on title
             document.querySelector('.note-title input').addEventListener('keydown', function(e) {
@@ -676,7 +796,5 @@ var vueApp = new Vue({
     }
 });
 
-
-// vueApp.use(VueDraggable);
 
 export default vueApp;

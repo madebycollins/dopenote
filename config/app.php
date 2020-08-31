@@ -6,7 +6,7 @@ return [
 	'version' => '1.0.0-alpha.1',
 	'github_url' => 'https://github.com/xy2z/dopenote',
 
-	// Fonts
+	// Fonts (user settings)
 	'fonts' => [
 		'Arial',
 		'Verdana',
@@ -19,9 +19,10 @@ return [
 
 	// Default user settings.
 	'default_user_settings' => (object) [
-		'font_size' => 12, // px
+		'font_size' => 13, // px
 		'font_family' => 'Verdana',
 		'line_height' => 1.5, // em
+		'paragraph_margin' => 1, // em
 	],
 
 

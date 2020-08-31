@@ -1,4 +1,15 @@
 #!/bin/bash
+set -e
+
+chmod +x /app/vendor/autoload.php
+chmod +x /app/public/index.php
+chmod 777 -R /app/storage/
+
+if [ "$1" != "apache2-foreground" ]; then
+	exec "$@"
+	exit
+fi
+
 
 echo "Preparing Dopenote..."
 
@@ -12,7 +23,7 @@ php artisan key:generate
 php artisan config:clear
 php artisan config:cache
 
-# Wait for database to be up and running
+# Wait for database to be up
 until nc -z ${DB_HOST} 3306; do sleep 1; echo "Waiting for DB to come up..."; done
 
 # Run migrations

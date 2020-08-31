@@ -10,8 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Foundation\Auth\RegistersUsers;
 
-class RegisterController extends Controller
-{
+class RegisterController extends Controller {
 	/*
 	|--------------------------------------------------------------------------
 	| Register Controller
@@ -72,6 +71,16 @@ class RegisterController extends Controller
 			return false;
 		}
 
+		self::create_new_user_note($user);
+
+		return $user;
+	}
+
+	/**
+	 * Create default note and notebook for a new user.
+	 *
+	 */
+	public static function create_new_user_note(User $user) {
 		// Create a default notebook
 		$notebook = Notebook::create([
 			'title' => 'My Notebook',
@@ -84,10 +93,8 @@ class RegisterController extends Controller
 			'user_id' => $user->id,
 			'notebook_id' => $notebook->id,
 			'title' => 'Welcome to Dopenote',
-			'content' => 'Thanks for trying out <strong>Dopenote</strong>!',
-			'starred' => true
+			'content' => view('welcome_note'),
+			'starred' => true,
 		]);
-
-		return $user;
 	}
 }
